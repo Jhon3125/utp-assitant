@@ -1,11 +1,3 @@
-"""
-tools.py
-Funciones (herramientas) que UTP Assistant puede invocar mediante function calling.
-- Jira: integración real vía REST API.
-- Google Calendar: integración real vía OAuth2.
-- CRM: simulado (mock).
-"""
-
 import os
 import datetime
 import requests
@@ -17,11 +9,11 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from dotenv import load_dotenv
 
+load_dotenv()
+
 # ---------------------------------------------------------------------------
 # 1. JIRA (REAL)
 # ---------------------------------------------------------------------------
-
-load_dotenv()
 
 JIRA_URL = os.getenv("JIRA_URL")
 JIRA_EMAIL = os.getenv("JIRA_EMAIL")
@@ -40,7 +32,7 @@ def crear_ticket_en_jira(titulo: str, descripcion: str, prioridad: str) -> dict:
             "Highest", "High", "Medium", "Low", "Lowest".
 
     Returns:
-        dict con el estado de la operación, el ID del ticket creado y el sistema usado.
+        dict con el estado de la operación, el ID del ticket, su link y el sistema usado.
     """
     url = f"{JIRA_URL}/rest/api/3/issue"
 
@@ -73,8 +65,10 @@ def crear_ticket_en_jira(titulo: str, descripcion: str, prioridad: str) -> dict:
         )
         resp.raise_for_status()
         data = resp.json()
-        print(f"[JIRA] Ticket creado: {data.get('key')}")
-        return {"status": "success", "ticket_id": data.get("key"), "sistema": "Jira"}
+        ticket_id = data.get("key")
+        link = f"{JIRA_URL}/browse/{ticket_id}"
+        print(f"[JIRA] Ticket creado: {ticket_id} ({link})")
+        return {"status": "success", "ticket_id": ticket_id, "link": link, "sistema": "Jira"}
     except requests.exceptions.RequestException as e:
         print(f"[JIRA] Error al crear ticket: {e}")
         return {"status": "error", "sistema": "Jira", "detalle": str(e)}
@@ -116,7 +110,7 @@ def agendar_reunion_en_google_calendar(asunto: str, fecha_tentativa: str, partic
         participantes: Lista de correos electrónicos de los invitados.
 
     Returns:
-        dict con el estado de la operación, el ID del evento creado y el sistema usado.
+        dict con el estado de la operación, el ID del evento, su link y el sistema usado.
     """
     try:
         service = _get_calendar_service()
@@ -131,8 +125,13 @@ def agendar_reunion_en_google_calendar(asunto: str, fecha_tentativa: str, partic
         }
 
         resultado = service.events().insert(calendarId="primary", body=evento).execute()
-        print(f"[CALENDAR] Evento creado: {resultado.get('id')}")
-        return {"status": "scheduled", "event_id": resultado.get("id"), "sistema": "Google Calendar"}
+        print(f"[CALENDAR] Evento creado: {resultado.get('id')} ({resultado.get('htmlLink')})")
+        return {
+            "status": "scheduled",
+            "event_id": resultado.get("id"),
+            "link": resultado.get("htmlLink"),
+            "sistema": "Google Calendar",
+        }
     except Exception as e:
         print(f"[CALENDAR] Error al agendar: {e}")
         return {"status": "error", "sistema": "Google Calendar", "detalle": str(e)}
